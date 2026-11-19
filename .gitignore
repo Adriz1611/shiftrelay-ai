@@ -20,10 +20,11 @@ test-results/
 .playwright-mcp/
 *.tsbuildinfo
 *.log
-.agents/
+# Downloaded third-party skills. Track the lockfile and any project-owned skills.
+/.agents/skills/agora/
+/.agents/skills/impeccable/
 .codex/
 .playwright-cli/
-skills-lock.json
 output/
 tmp/
 .cache/
