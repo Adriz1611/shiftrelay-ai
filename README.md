@@ -8,4 +8,4 @@ Run `npm.cmd test`, `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run bu
 
 ## Agent tooling
 
-[AGENTS.md](AGENTS.md) contains the repository's instructions. [skills-lock.json](skills-lock.json) records the Agora skill source and revision. Install the optional Agora and Impeccable skills locally for agent-assisted development. Their downloaded folders are ignored, and project-owned skills under `.agents/skills/` can be tracked.
+[AGENTS.md](AGENTS.md) contains the repository's instructions. The project includes [Agora](.agents/skills/agora/SKILL.md) and [Impeccable](.agents/skills/impeccable/SKILL.md) for agent-assisted development. [skills-lock.json](skills-lock.json) records the Agora skill source and revision.
