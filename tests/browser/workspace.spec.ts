@@ -19,15 +19,13 @@ for (const width of [390, 1440]) {
         await expect.poll(() => logo.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
       }
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-      await scenario.getByRole("link", { name: "Sign in to inspect GitHub sources" }).click();
+      await scenario.getByRole("link", { name: "Explore the workspace" }).click();
       await expect(page).toHaveURL(/\/workspace$/);
       await expect(
         page.getByRole("heading", { name: "Incident workspace." }),
       ).toBeVisible();
-      await page.getByRole("button", { name: "Check latest build" }).click();
-      await expect(
-        page.getByText("Sign in as the demo operator first."),
-      ).toBeVisible();
+      await expect(page.getByRole("button", { name: "Start voice session" })).toBeVisible();
+      await expect(page.getByLabel("Operator password")).toHaveCount(0);
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,
@@ -40,7 +38,7 @@ for (const width of [390, 1440]) {
       ).toBeVisible();
       await expect(
         page.getByRole("complementary", { name: "Evidence inspector" }),
-      ).toContainText("Investigation target");
+      ).toContainText("Checkout deployment");
       if (width > 840)
         await page.getByRole("button", { name: "Show evidence list" }).click();
       await expect(page.locator(".xr-finding-list")).toBeVisible();

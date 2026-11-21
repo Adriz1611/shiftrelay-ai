@@ -17,9 +17,9 @@ import {
   revokeAgent,
 } from "../lib/voice-sessions";
 import { authorize, login } from "../lib/auth";
-export async function signIn(password: string) {
+export async function signIn() {
   try {
-    await login(password);
+    await login();
     return "Signed in";
   } catch (e) {
     return (e as Error).message;

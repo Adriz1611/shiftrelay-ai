@@ -17,7 +17,7 @@ test("a workspace command opens X-Ray and keeps the selected evidence visible ac
   const signature = createHmac("sha256", process.env.SHIFTRELAY_BROWSER_SECRET!).update(expires).digest("hex");
   await context.addCookies([{ name: "operator", value: expires + "." + signature, url: "http://127.0.0.1:3167" }]);
   await page.goto("/workspace");
-  await expect(page.getByText("Operator signed in", { exact: true })).toBeVisible();
+  await expect(page.getByText("Workspace ready", { exact: true })).toBeVisible();
   sendWorkspaceCommand({ kind: "spotlight", steps: evidenceSpotlight(evidence) });
   await expect(page.getByRole("heading", { name: "Incident X-Ray" })).toBeVisible();
   const inspector = page.getByRole("complementary", { name: "Evidence inspector" });

@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { createHmac, timingSafeEqual, createHash } from "node:crypto";
 export function same(a: string, b: string) {
   const hash = (v: string) => createHash("sha256").update(v).digest();
@@ -10,12 +11,10 @@ function sign(value: string) {
     throw new Error("Configure SESSION_SECRET (32 or more characters).");
   return createHmac("sha256", secret).update(value).digest("hex");
 }
-export async function login(password: string) {
-  if (
-    !process.env.DEMO_OPERATOR_PASSWORD ||
-    !same(password, process.env.DEMO_OPERATOR_PASSWORD)
-  )
-    throw new Error("Operator sign-in unavailable or password incorrect.");
+export async function login() {
+  const host = (await headers()).get("host") ?? "";
+  if (!/^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(host))
+    throw new Error("Demo access is available on the local machine.");
   const end = String(Date.now() + 3600000);
   (await cookies()).set("operator", end + "." + sign(end), {
     httpOnly: true,

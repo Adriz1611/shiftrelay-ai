@@ -25,6 +25,7 @@
 }
 .form label {
   display: block;
+  margin-bottom: .45rem;
   font-weight: 700;
 }
 .form > div {
@@ -61,15 +62,22 @@
 .nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.2rem;
-  border-block: 1px solid var(--line);
-  padding: 0.5rem 0;
+  gap: 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--soft);
+  padding: 0.45rem;
   margin-bottom: 1.5rem;
 }
 .nav button {
-  padding: 0.55rem 0.9rem;
+  padding: 0.7rem 1rem;
+  border-radius: 8px;
+  background: transparent;
   font-weight: 650;
 }
+.nav button:hover:not([aria-current]) { background: var(--card); }
+.nav button[aria-current] { border-radius: 8px; }
+.form small { display: block; margin-top: .4rem; }
 .form button:disabled {
   opacity: 0.45;
   cursor: default;

@@ -234,7 +234,7 @@ export default function Workspace() {
           </div>
           <span className="access">
             <i className={signedIn ? "online" : ""} />
-            {signedIn ? "Operator signed in" : "Operator access"}
+            {signedIn ? "Workspace ready" : "Connecting"}
           </span>
         </div>
       </header>
@@ -264,15 +264,14 @@ export default function Workspace() {
         ) : (
           <div className="page-heading workspace-heading">
             <div>
+              <span className="workspace-eyebrow"><span /> INCIDENT OPERATIONS</span>
               <h1>Incident workspace.</h1>
               <p>
                 Investigate checkout failures and carry context into the next
                 shift.
               </p>
-              {signedIn && <button className="secondary" onClick={() => setRepoRoom({mode:"briefing"})}>
-                <GitBranch size={16} /> Explore repository
-              </button>}
             </div>
+            <div className="workspace-shortcuts">
             <button
               type="button"
               className="xray-launch workspace-xray-launch"
@@ -294,6 +293,12 @@ export default function Workspace() {
               </span>
               <ArrowRight size={20} aria-hidden="true" />
             </button>
+            {signedIn && <button className="workspace-repo-launch" onClick={() => setRepoRoom({mode:"briefing"})}>
+              <span className="workspace-repo-icon"><GitBranch size={21} /></span>
+              <span><strong>Explore repository</strong><small>Briefing, history &amp; planning</small></span>
+              <ArrowRight size={18} />
+            </button>}
+            </div>
           </div>
         )}
         {xray && (
@@ -401,9 +406,12 @@ export default function Workspace() {
                   </span>
                   <h3>No investigation loaded</h3>
                   <p>
-                    Sign in and check the latest build, or ask ShiftRelay to
+                    Check the latest build, or ask ShiftRelay to
                     investigate by voice.
                   </p>
+                  <button className="workspace-empty-action" onClick={check} disabled={busy}>
+                    <RefreshCw size={15} /> {busy ? "Checking…" : "Investigate latest build"}
+                  </button>
                 </div>
               ) : (
                 <div className="incident-content">

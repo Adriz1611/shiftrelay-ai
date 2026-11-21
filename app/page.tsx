@@ -77,7 +77,7 @@ export default function LandingPage() {
                 <blockquote>“What changed since the last passing checkout run?”</blockquote>
               </figure>
               <Link href="/workspace" className={styles.sourceLink}>
-                Sign in to inspect GitHub sources <ArrowRight size={17} aria-hidden="true" />
+                Explore the workspace <ArrowRight size={17} aria-hidden="true" />
               </Link>
             </section>
           </div>

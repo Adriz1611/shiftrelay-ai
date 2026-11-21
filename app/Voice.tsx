@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { signIn, startVoice, stopVoice } from "./voice-actions";
 import Markdown from "react-markdown";
-import { AudioLines, LockKeyhole, Mic, MicOff, Square } from "lucide-react";
+import { AudioLines, Mic, MicOff, Square } from "lucide-react";
 import type { VoiceSignal } from "./VoiceProvider";
 import { createAudioMeter } from "../lib/audio-meter";
 
@@ -22,7 +22,6 @@ export default function Voice({
     [active, setActive] = useState(false);
   const [turns, setTurns] = useState<{ role: string; text: string }[]>([]);
   const [historyError, setHistoryError] = useState(false);
-  const [signingIn, setSigningIn] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -40,6 +39,23 @@ export default function Voice({
   const audioLevel = useRef<(() => number) | null>(null);
   const agentPlaybackLevel = useRef<(() => number) | null>(null);
   const connected = active && message === "CONNECTED";
+
+  useEffect(() => {
+    if (signedIn) return;
+    let cancelled = false;
+    async function openDemo() {
+      try {
+        const result = await signIn();
+        if (cancelled) return;
+        if (result === "Signed in") await onSignIn();
+        else setLoginError(result);
+      } catch {
+        if (!cancelled) setLoginError("Unable to open the workspace. Refresh to retry.");
+      }
+    }
+    void openDemo();
+    return () => { cancelled = true; };
+  }, [signedIn, onSignIn]);
 
   useEffect(() => {
     const bars = Array.from(
@@ -390,44 +406,7 @@ export default function Voice({
                 {busy ? status : active ? "End session" : "Start voice session"}
               </button>
             ) : (
-              <form
-                className="sign-in"
-                onSubmit={async (event) => {
-                  event.preventDefault();
-                  const form = event.currentTarget;
-                  const password = String(new FormData(form).get("password"));
-                  setSigningIn(true);
-                  setLoginError("");
-                  try {
-                    const result = await signIn(password);
-                    if (result === "Signed in") {
-                      form.reset();
-                      await onSignIn();
-                    } else setLoginError(result);
-                  } catch {
-                    setLoginError("Unable to sign in. Try again.");
-                  } finally {
-                    setSigningIn(false);
-                  }
-                }}
-              >
-                <label htmlFor="operator-password">
-                  <LockKeyhole size={14} /> Operator password
-                </label>
-                <div>
-                  <input
-                    id="operator-password"
-                    type="password"
-                    name="password"
-                    autoComplete="current-password"
-                    required
-                  />
-                  <button disabled={signingIn}>
-                    {signingIn ? "Signing in…" : "Sign in"}
-                  </button>
-                </div>
-                {loginError && <p role="alert">{loginError}</p>}
-              </form>
+              <p role="status">{loginError || "Opening workspace…"}</p>
             )}
             {message.startsWith("Session unavailable") && (
               <p className="voice-error" role="alert">
