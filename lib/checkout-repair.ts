@@ -152,17 +152,21 @@ export function repairReceipt(id: string, value?: Receipt): Receipt | null {
   }
 }
 
-export function latestRepair(): Receipt | null {
+export function latestRepair(sourceRun?: string): Receipt | null {
   const connection = db();
   try {
     connection.exec(
       "CREATE TABLE IF NOT EXISTS checkout_repairs (id TEXT PRIMARY KEY, receipt TEXT NOT NULL)",
     );
-    const row = connection
-      .prepare(
-        "SELECT receipt FROM checkout_repairs ORDER BY rowid DESC LIMIT 1",
-      )
-      .get();
+    const row = sourceRun
+      ? connection
+          .prepare(
+            "SELECT receipt FROM checkout_repairs WHERE json_extract(receipt, '$.sourceRun') = ? ORDER BY rowid DESC LIMIT 1",
+          )
+          .get(sourceRun)
+      : connection
+          .prepare("SELECT receipt FROM checkout_repairs ORDER BY rowid DESC LIMIT 1")
+          .get();
     return row ? JSON.parse(String(row.receipt)) : null;
   } finally {
     connection.close();

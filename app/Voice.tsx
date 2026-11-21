@@ -143,6 +143,13 @@ export default function Voice({
       };
       try {
         const session = await startVoice();
+        if (session.callbackUnavailable) {
+          await cleanup();
+          setMessage(
+            "Session unavailable. The voice tools could not be reached. Check the callback proxy and HTTPS tunnel.",
+          );
+          return;
+        }
         id = session.id;
         onSignal({ sessionId: session.id });
         rtc.on("user-published", async (user, type) => {
@@ -483,7 +490,22 @@ export default function Voice({
               <strong>
                 {turn.role === "user" ? "Operator" : "ShiftRelay"}
               </strong>
-              <Markdown skipHtml components={{ img: ({ alt }) => alt ?? null }}>
+              <Markdown
+                skipHtml
+                components={{
+                  img: ({ alt }) => alt ?? null,
+                  a: ({ href, title, children }) => (
+                    <a
+                      href={href}
+                      title={title}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {children}
+                    </a>
+                  ),
+                }}
+              >
                 {turn.text}
               </Markdown>
             </div>

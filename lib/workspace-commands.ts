@@ -7,6 +7,7 @@ import type {
 } from "./checkout-repair";
 
 type Command =
+  | { kind: "repository"; mode: "briefing" | "plan" | "onboard" | "health" | "history"; hours?: number }
   | { kind: "spotlight"; steps: SpotlightStep[]; agentId?: string }
   | { kind: "focus"; nodeId: string }
   | { kind: "xray" | "review" }

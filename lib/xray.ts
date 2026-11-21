@@ -119,6 +119,9 @@ export function buildXray(
   const incident = "checkout-incident";
   const workflow = data.url ? "run:" + data.url : incident;
   const logs = data.jobLogEvidence?.flatMap((job) => job.errors) ?? [];
+  const manifestValidatorOutput = /missing paymentSchemaRevision/i.test(
+    logs[0] ?? "",
+  );
   const diff = data.comparison?.manifestChange;
   add({
     id: incident,
@@ -160,7 +163,11 @@ export function buildXray(
         id: workflow + ":failure",
         kind: "evidence",
         classification: "Confirmed",
-        title: logs.length ? "Validator output" : "Failed step",
+        title: manifestValidatorOutput
+          ? "Validator output"
+          : logs.length
+            ? "Job log output"
+            : "Failed step",
         summary: logs[0] ?? data.steps![0],
         detail: logs.join("\n") || data.steps!.join("\n"),
         relation: "Observed output",

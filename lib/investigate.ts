@@ -24,7 +24,11 @@ export async function readHistoricalIssue(url: string) {
     );
     if (!response.ok) return null;
     const issue = await response.json();
+    if (issue.pull_request || issue.number !== Number(match[2])) return null;
     return {
+      number: issue.number,
+      title: String(issue.title),
+      url: parsed.href,
       state: String(issue.state),
       excerpt: typeof issue.body === "string" ? issue.body.slice(0, 700) : null,
     };
@@ -60,7 +64,8 @@ export async function investigate(
     return (await request(path)).json();
   }
   const runs = await read(
-    "/actions/workflows/" + encodeURIComponent(workflow) + "/runs?per_page=1",
+    "/actions/workflows/" + encodeURIComponent(workflow) + "/runs?per_page=1&event=push&branch=" +
+      encodeURIComponent(process.env.GITHUB_DEPLOY_BRANCH || "main"),
   );
   const run = runs.workflow_runs[0];
   if (!run) throw new Error("This workflow has no runs.");

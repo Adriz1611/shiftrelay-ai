@@ -125,7 +125,11 @@ export default function CheckoutRepair({
         <dl className="handover-proof">
           <dt>Repair PR</dt>
           <dd>
-            <a href={result.receipt.url}>
+            <a
+              target="_blank"
+              rel="noopener noreferrer"
+              href={result.receipt.url}
+            >
               #{result.receipt.number} ·{" "}
               {result.verification.merged ? "Merged" : "Review in GitHub"}{" "}
               <ExternalLink size={13} />
@@ -134,7 +138,11 @@ export default function CheckoutRepair({
           <dt>PR validation</dt>
           <dd>
             {result.verification.pullRequestRun ? (
-              <a href={result.verification.pullRequestRun.url}>
+              <a
+                target="_blank"
+                rel="noopener noreferrer"
+                href={result.verification.pullRequestRun.url}
+              >
                 {runLabel(result.verification.pullRequestRun)}
               </a>
             ) : (
@@ -144,7 +152,11 @@ export default function CheckoutRepair({
           <dt>Main validation</dt>
           <dd>
             {result.verification.mainRun ? (
-              <a href={result.verification.mainRun.url}>
+              <a
+                target="_blank"
+                rel="noopener noreferrer"
+                href={result.verification.mainRun.url}
+              >
                 {runLabel(result.verification.mainRun)}
               </a>
             ) : result.verification.merged ? (

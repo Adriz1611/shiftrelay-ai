@@ -5,6 +5,22 @@ for (const width of [390, 1440]) {
     async ({ page, request }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/");
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      const scenario = page.getByRole("region", {
+        name: "Bengaluru night market checkout demo",
+      });
+      await expect(scenario).toContainText("required payment schema revision");
+      await expect(scenario.getByRole("blockquote")).toContainText(
+        "What changed since the last passing checkout run?",
+      );
+      for (const name of ["Agora", "Murf"]) {
+        const logo = page.getByRole("img", { name, exact: true });
+        await logo.scrollIntoViewIfNeeded();
+        await expect.poll(() => logo.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await scenario.getByRole("link", { name: "Sign in to inspect GitHub sources" }).click();
+      await expect(page).toHaveURL(/\/workspace$/);
       await expect(
         page.getByRole("heading", { name: "Incident workspace." }),
       ).toBeVisible();

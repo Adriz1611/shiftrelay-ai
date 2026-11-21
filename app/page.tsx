@@ -1,693 +1,114 @@
-"use client";
+import type { Metadata } from "next";
+import Image from "next/image";
+import Link from "next/link";
+import { ArrowDownRight, ArrowRight, AudioLines } from "lucide-react";
+import styles from "./landing.module.css";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  Activity,
-  ArrowDownLeft,
-  ArrowRight,
-  Box,
-  ExternalLink,
-  FileText,
-  GitBranch,
-  History,
-  RefreshCw,
-  ScanLine,
-} from "lucide-react";
-import { usePersistentVoice } from "./VoiceProvider";
-import IncidentXray from "./IncidentXray";
-import CheckoutRepair from "./CheckoutRepair";
-import { rehearseRecovery } from "./rehearsal-actions";
-import { loadEvidence, review, retryDiscord, readWorkspace } from "./actions";
-
-type EvidenceResponse = Extract<
-  Awaited<ReturnType<typeof loadEvidence>>,
-  { data: unknown }
->;
-type Result = {
-  data?: EvidenceResponse["data"];
-  proposal?: EvidenceResponse["proposal"];
-  error?: string;
+export const metadata: Metadata = {
+  title: "ShiftRelay AI · Voice-first incident handovers",
+  description:
+    "Investigate a failed deployment by voice, verify what changed, and hand off the evidence to the next engineer.",
 };
-type VoiceCommand = NonNullable<
-  Awaited<ReturnType<typeof readWorkspace>>
->["commands"][number];
 
-export default function Workspace() {
-  const { mount, configure, signal } = usePersistentVoice();
-  const [result, setResult] = useState<Result>({});
-  const [busy, setBusy] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [retryId, setRetryId] = useState("");
-  const [events, setEvents] = useState<
-    { id: number; time: string; text: string }[]
-  >([]);
-  const [status, setStatus] = useState("");
-  const [receipt, setReceipt] = useState("");
-  const [handoverSummary, setHandoverSummary] = useState("");
-  const [rehearsal, setRehearsal] =
-    useState<Awaited<ReturnType<typeof rehearseRecovery>>>();
-  const [rehearsing, setRehearsing] = useState(false);
-  const [rehearsalError, setRehearsalError] = useState(false);
-  const [signedIn, setSignedIn] = useState(false);
-  const [repair, setRepair] =
-    useState<NonNullable<Awaited<ReturnType<typeof readWorkspace>>>["repair"]>(
-      null,
-    );
-  const [xray, setXray] = useState(false);
-  const voiceCursor = useRef<number | null>(null);
-  const [voiceCommand, setVoiceCommand] = useState<VoiceCommand>();
-  const [spotlight, setSpotlight] =
-    useState<Extract<VoiceCommand, { kind: "spotlight" }>>();
-  const [repairCommand, setRepairCommand] =
-    useState<Extract<VoiceCommand, { kind: "preview" | "status" }>>();
-  const [offline, setOffline] = useState(false);
-  const [progress, setProgress] = useState<{
-    phase: "running" | "failed";
-    evidence: unknown;
-  } | null>(null);
+const chapters = [
+  {
+    title: "Ask what changed.",
+    copy: "Start with the failed deployment. Ask ShiftRelay to trace it back to the last passing run and take you to the strongest evidence.",
+  },
+  {
+    title: "Check the evidence.",
+    copy: "Read the Git diff and the failed step’s output in Incident X-Ray. Review the proposed GitHub comment and Discord update before they go out.",
+  },
+  {
+    title: "Brief the next shift.",
+    copy: "Start a fresh voice session. The handover carries forward the linked evidence, delivery receipts, and the next open check.",
+  },
+];
 
-  const refresh = useCallback(async () => {
-    try {
-      const record = await readWorkspace();
-      setSignedIn(Boolean(record));
-      setOffline(false);
-      setRepair(record?.repair ?? null);
-      if (record) {
-        const cursor = voiceCursor.current;
-        const commands = record.commands;
-        const newest = commands.at(-1);
-        if (cursor !== null) {
-          for (const command of commands) {
-            if (command.id <= cursor) continue;
-            setXray(
-              command.kind === "xray" ||
-                command.kind === "spotlight" ||
-                command.kind === "focus",
-            );
-            setVoiceCommand(command);
-            if (command.kind === "spotlight") setSpotlight(command);
-            else setSpotlight(undefined);
-            if (command.kind === "preview" || command.kind === "status")
-              setRepairCommand(command);
-          }
-        }
-        voiceCursor.current = Math.max(cursor ?? 0, newest?.id ?? 0);
-      }
-      setProgress((previous) =>
-        JSON.stringify(previous) === JSON.stringify(record?.progress ?? null)
-          ? previous
-          : (record?.progress ?? null),
-      );
-      if (record?.evidence) {
-        setEvents(record.events ?? []);
-        setRetryId(record.retryId ?? "");
-        setStatus(record.state ?? "");
-        setReceipt(record.github ?? "");
-        setHandoverSummary(record.summary ?? "");
-        setResult((previous) => ({
-          data: record.evidence,
-          proposal: record.proposal,
-          error: previous.error,
-        }));
-      }
-    } catch {
-      setOffline(true);
-    }
-  }, []);
-
-  useEffect(() => configure(signedIn, refresh), [configure, signedIn, refresh]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
-    async function poll() {
-      await refresh();
-      if (!cancelled) timer = setTimeout(poll, xray || signedIn ? 950 : 3000);
-    }
-    timer = setTimeout(poll, 0);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [refresh, xray, signedIn]);
-
-  useEffect(() => {
-    if (
-      !voiceCommand ||
-      voiceCommand.kind === "xray" ||
-      voiceCommand.kind === "spotlight" ||
-      voiceCommand.kind === "focus" ||
-      xray
-    )
-      return;
-    const target =
-      voiceCommand.kind === "review"
-        ? (document.getElementById("approval-proposal") ??
-          document.getElementById("operator-decision"))
-        : document.getElementById("checkout-repair");
-    target?.scrollIntoView({ block: "nearest" });
-    target?.focus({ preventScroll: true });
-  }, [voiceCommand, xray]);
-
-  async function check() {
-    setNotice("");
-    setBusy(true);
-    setResult((previous) => ({ ...previous, error: undefined }));
-    try {
-      const response = await loadEvidence();
-      if ("error" in response)
-        setResult((previous) => ({ ...previous, error: response.error }));
-      else {
-        setResult(response);
-        await refresh();
-      }
-    } catch {
-      setResult((previous) => ({
-        ...previous,
-        error: "Unable to reach the investigation service.",
-      }));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function perform(action: () => Promise<string>) {
-    setSaving(true);
-    setNotice("");
-    try {
-      setNotice(await action());
-      await refresh();
-    } catch {
-      setNotice(
-        "Unable to confirm the result. Check the activity before retrying.",
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const { data, proposal, error } = result;
-  const stateLabel = proposal
-    ? "Approval needed"
-    : status === "succeeded"
-      ? "Handover saved"
-      : status
-        ? status.replaceAll("_", " ")
-        : "Investigation";
-
+function Wordmark() {
   return (
-    <>
-      <header className="topbar">
-        <div className="shell topbar-inner">
-          <div className="brand">
-            <span className="brand-mark">
-              <ArrowDownLeft size={17} />
-              <ArrowRight size={17} />
-            </span>
-            ShiftRelay<span className="brand-detail">Incident operations</span>
-          </div>
-          <span className="access">
-            <i className={signedIn ? "online" : ""} />
-            {signedIn ? "Operator signed in" : "Operator access"}
-          </span>
+    <Link href="/" className={styles.wordmark} aria-label="ShiftRelay AI home">
+      <span className={styles.mark}><AudioLines size={20} aria-hidden="true" /></span>
+      <span>ShiftRelay <small>AI</small></span>
+    </Link>
+  );
+}
+
+function WorkspaceLink() {
+  return (
+    <Link href="/workspace" className={styles.launch}>
+      Open workspace <ArrowRight size={20} aria-hidden="true" />
+    </Link>
+  );
+}
+
+export default function LandingPage() {
+  return (
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <div className={styles.wrap}>
+          <Wordmark />
+          <nav aria-label="Main navigation">
+            <a className={styles.navStory} href="#how-it-works">How it works</a>
+            <Link className={styles.navLink} href="/workspace">
+              Workspace <ArrowDownRight size={17} aria-hidden="true" />
+            </Link>
+          </nav>
         </div>
       </header>
-      <main
-        className={xray ? "shell workspace xray-workspace" : "shell workspace"}
-      >
-        <div className={xray ? "xray-back" : "page-heading"}>
-          {!xray && (
-            <div>
-              <h1>Incident workspace.</h1>
+
+      <main>
+        <section className={styles.hero} aria-labelledby="landing-title">
+          <div className={`${styles.wrap} ${styles.heroGrid}`}>
+            <div className={styles.intro}>
+              <h1 id="landing-title">Pick up where the <em>last shift left off.</em></h1>
+              <p>A voice-first incident workspace for engineers taking over a failed deployment. Ask what broke, check the evidence, and brief the next shift.</p>
+              <WorkspaceLink />
+            </div>
+
+            <section className={styles.scenario} aria-labelledby="scenario-title">
+              <h2 id="scenario-title">Bengaluru night market checkout demo</h2>
               <p>
-                Investigate checkout failures and carry context into the next
-                shift.
+                In this controlled scenario, the checkout quote service fails CI
+                validation because its manifest is missing the required payment schema revision.
               </p>
-            </div>
-          )}
-          <button
-            type="button"
-            className={xray ? "secondary" : "xray-launch"}
-            aria-pressed={xray}
-            onClick={() => {
-              setSpotlight(undefined);
-              setXray(!xray);
-            }}
-          >
-            <ScanLine size={18} />{" "}
-            {xray ? "Back to workspace" : "Open Incident X-Ray"}
-          </button>
-        </div>
-        {xray && (
-          <IncidentXray
-            spotlight={
-              spotlight &&
-              (!signal.sessionId ||
-                !spotlight.agentId ||
-                signal.sessionId === spotlight.agentId)
-                ? spotlight
-                : undefined
-            }
-            voiceSignal={signal}
-            voiceFocus={
-              voiceCommand?.kind === "focus" || voiceCommand?.kind === "xray"
-                ? voiceCommand
-                : undefined
-            }
-            onStopSpotlight={() => setSpotlight(undefined)}
-            repair={repair}
-            source={progress ? progress.evidence : data}
-            action={
-              progress
-                ? undefined
-                : proposal
-                  ? { target: proposal.target, summary: proposal.body }
-                  : status
-                    ? {
-                        state: status,
-                        summary: handoverSummary,
-                        github: receipt,
-                      }
-                    : undefined
-            }
-            phase={
-              offline
-                ? "offline"
-                : progress?.phase === "failed" || error
-                  ? "failed"
-                  : progress?.phase === "running" || busy
-                    ? "running"
-                    : "idle"
-            }
-            onInvestigate={() => void check()}
-            onReview={() => setXray(false)}
-          />
-        )}
-        <div className="desk" hidden={xray}>
-          {!xray && <div className="workspace-voice-slot" ref={mount} />}
-          <section
-            className="incident panel"
-            aria-labelledby="incident-heading"
-          >
-            <div className="panel-heading">
-              <div className="heading-icon">
-                <Activity size={20} />
-              </div>
-              <div>
-                <h2 id="incident-heading">Checkout deployment</h2>
-                <span className="muted">Investigation &amp; handover</span>
-              </div>
-              <button
-                className="secondary refresh"
-                disabled={busy}
-                onClick={check}
-              >
-                <RefreshCw size={15} className={busy ? "spin" : ""} />
-                {busy ? "Checking…" : "Check latest build"}
-              </button>
-            </div>
-            <div
-              className="incident-scroll"
-              tabIndex={0}
-              role="region"
-              aria-label="Investigation details"
-            >
-              {error && (
-                <p className="feedback" role="alert">
-                  {error}
-                </p>
-              )}
-              {!data ? (
-                <div className="empty">
-                  <Box size={29} />
-                  <h3>No investigation loaded</h3>
-                  <p>
-                    Sign in and check the latest build, or ask ShiftRelay to
-                    investigate by voice.
-                  </p>
-                </div>
-              ) : (
-                <div className="incident-content">
-                  <div className="evidence">
-                    <div className="row-title">
-                      <h3>Build evidence</h3>
-                      <span className="tag">{data.conclusion}</span>
-                    </div>
-                    <a className="reference" href={data.url}>
-                      <GitBranch size={16} />
-                      {data.run}
-                      <ExternalLink size={13} />
-                    </a>
-                    <ul className="steps">
-                      {data.steps.map((step) => (
-                        <li key={step}>{step}</li>
-                      ))}
-                    </ul>
-                    {!!data.jobLogEvidence?.some(
-                      ({ errors }) => errors.length > 0,
-                    ) && (
-                      <details open>
-                        <summary>Failed job log evidence</summary>
-                        {data.jobLogEvidence
-                          .filter(({ errors }) => errors.length > 0)
-                          .map(({ url, errors }) => (
-                            <div key={url}>
-                              <ul className="steps">
-                                {errors.map((message, index) => (
-                                  <li key={index}>{message}</li>
-                                ))}
-                              </ul>
-                              <a href={url}>
-                                View GitHub job <ExternalLink size={12} />
-                              </a>
-                            </div>
-                          ))}
-                      </details>
-                    )}
-                    {data.comparison && (
-                      <div className="build-comparison">
-                        <h3>Compare with last passing build</h3>
-                        <dl>
-                          <dt>Current Git commit</dt>
-                          <dd>
-                            <code>{data.comparison.revision.slice(0, 8)}</code>{" "}
-                            · {data.comparison.branch}
-                          </dd>
-                          <dt>Last passing Git commit</dt>
-                          <dd>
-                            {data.comparison.baseline ? (
-                              <a href={data.comparison.baseline.url}>
-                                <code>
-                                  {data.comparison.baseline.revision.slice(
-                                    0,
-                                    8,
-                                  )}
-                                </code>{" "}
-                                <ExternalLink size={12} />
-                              </a>
-                            ) : data.comparison.status === "unavailable" ? (
-                              "GitHub comparison unavailable"
-                            ) : (
-                              "No earlier passing run on this branch"
-                            )}
-                          </dd>
-                        </dl>
-                        {data.comparison.manifestChange && (
-                          <details open>
-                            <summary>Checkout manifest diff</summary>
-                            <pre className="manifest-diff">
-                              {data.comparison.manifestChange.patch
-                                .split("\n")
-                                .map((line, index) => (
-                                  <span
-                                    key={index}
-                                    className={
-                                      line.startsWith("-")
-                                        ? "removed"
-                                        : line.startsWith("+")
-                                          ? "added"
-                                          : undefined
-                                    }
-                                  >
-                                    {line}
-                                    {"\n"}
-                                  </span>
-                                ))}
-                            </pre>
-                            <a href={data.comparison.manifestChange.url}>
-                              Verify diff on GitHub <ExternalLink size={12} />
-                            </a>
-                          </details>
-                        )}
-                        <p className="muted">
-                          {data.comparison.manifestChange
-                            ? "Pair the manifest change with the failed job log to verify the regression."
-                            : "The failed step identifies where validation stopped. The cause still needs confirmation."}
-                        </p>
-                      </div>
-                    )}
-                    {data.runbook && (
-                      <details>
-                        <summary>
-                          <FileText size={15} />
-                          Runbook guidance
-                        </summary>
-                        <p>
-                          {data.runbook.excerpt
-                            .replace(/^#.*\r?\n+/, "")
-                            .replace(/\*\*/g, "")}
-                        </p>
-                        <a href={data.runbook.url}>
-                          Read source <ExternalLink size={12} />
-                        </a>
-                      </details>
-                    )}
-                    <div className="related">
-                      <h3>Related issues</h3>
-                      {data.candidates.length ? (
-                        data.candidates.map((issue) => (
-                          <a
-                            className="reference"
-                            key={issue.number}
-                            href={issue.url}
-                          >
-                            <span>#{issue.number}</span>
-                            {issue.title}
-                            <ExternalLink size={13} />
-                          </a>
-                        ))
-                      ) : (
-                        <p className="muted">No matching open issue.</p>
-                      )}
-                      {!!data.historicalIssues?.length && (
-                        <details>
-                          <summary>Closed checkout incidents</summary>
-                          {data.historicalIssues.map((issue) => (
-                            <a
-                              className="reference"
-                              key={issue.number}
-                              href={issue.url}
-                            >
-                              #{issue.number} {issue.title}{" "}
-                              <ExternalLink size={13} />
-                            </a>
-                          ))}
-                        </details>
-                      )}
-                    </div>
-                  </div>
-                  <div
-                    className="decision"
-                    id="operator-decision"
-                    tabIndex={-1}
-                  >
-                    <div className="row-title">
-                      <h3>
-                        {status === "succeeded"
-                          ? "Shift handover"
-                          : "Operator decision"}
-                      </h3>
-                      <span className="tag">{stateLabel}</span>
-                    </div>
-                    {!proposal && (
-                      <div className="decision-result">
-                        <p className="muted">
-                          {status === "succeeded"
-                            ? "The GitHub update and Discord delivery are recorded in the handover."
-                            : status === "declined"
-                              ? "The proposal was declined."
-                              : "There is no proposal awaiting approval."}
-                        </p>
-                        {receipt && (
-                          <a className="reference" href={receipt}>
-                            View the GitHub update <ExternalLink size={13} />
-                          </a>
-                        )}
-                        {status === "succeeded" && (
-                          <dl className="handover-proof">
-                            <dt>Failure</dt>
-                            <dd>{data.steps.join(", ") || data.conclusion}</dd>
-                            <dt>GitHub</dt>
-                            <dd>Update recorded</dd>
-                            <dt>Discord</dt>
-                            <dd>Notification delivered</dd>
-                            <dt>Next shift</dt>
-                            <dd>
-                              Review the manifest diff and failed job log before
-                              deciding on a fix.
-                            </dd>
-                          </dl>
-                        )}
-                        {handoverSummary && (
-                          <button
-                            className="secondary"
-                            onClick={async () => {
-                              try {
-                                await navigator.clipboard.writeText(
-                                  [
-                                    "Checkout deployment handover",
-                                    "Build: " + data.url,
-                                    ...data.steps.map(
-                                      (step) => "Failed step: " + step,
-                                    ),
-                                    handoverSummary,
-                                    "Root cause: unconfirmed.",
-                                    "Next check: inspect the workflow annotation and compare the payment schema revision with the last successful run.",
-                                    ...(data.runbook
-                                      ? ["Runbook: " + data.runbook.url]
-                                      : []),
-                                  ].join("\n"),
-                                );
-                                setNotice("Handover copied.");
-                              } catch {
-                                setNotice(
-                                  "Clipboard unavailable in this browser.",
-                                );
-                              }
-                            }}
-                          >
-                            Copy handover
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    {proposal && (
-                      <div
-                        className="proposal"
-                        id="approval-proposal"
-                        tabIndex={-1}
-                      >
-                        <strong>{proposal.target}</strong>
-                        <pre>{proposal.body}</pre>
-                        <p className="muted">
-                          Send the same evidence to Discord and save the
-                          handover.
-                        </p>
-                        <div className="button-row">
-                          <button
-                            disabled={saving}
-                            onClick={() =>
-                              void perform(() => review(proposal.id, true))
-                            }
-                          >
-                            Approve actions
-                          </button>
-                          <button
-                            className="secondary"
-                            disabled={saving}
-                            onClick={() =>
-                              void perform(() => review(proposal.id, false))
-                            }
-                          >
-                            Decline
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {retryId && (
-                      <button
-                        className="secondary"
-                        disabled={saving}
-                        onClick={() =>
-                          void perform(() => retryDiscord(retryId))
-                        }
-                      >
-                        Retry Discord notification
-                      </button>
-                    )}
-                    {(saving || notice) && (
-                      <p className="feedback" role="status">
-                        {saving ? "Saving decision…" : notice}
-                      </p>
-                    )}
-                    {signedIn &&
-                      (data.comparison?.manifestChange || repair) && (
-                        <CheckoutRepair
-                          key={repairCommand?.id ?? 0}
-                          initialPlan={
-                            repairCommand?.kind === "preview"
-                              ? repairCommand.plan
-                              : undefined
-                          }
-                          initialResult={
-                            repairCommand?.kind === "status"
-                              ? repairCommand.result
-                              : undefined
-                          }
-                          onVerification={({ receipt, verification }) =>
-                            setRepair({ ...receipt, verification })
-                          }
-                        />
-                      )}
-                    {signedIn && (
-                      <details className="rehearsal">
-                        <summary>Recovery rehearsal · simulated</summary>
-                        <p className="muted">
-                          Run the real approval and retry logic with test
-                          responses in an isolated database.
-                        </p>
-                        <button
-                          className="secondary"
-                          disabled={rehearsing}
-                          onClick={async () => {
-                            setRehearsing(true);
-                            setRehearsalError(false);
-                            setRehearsal(undefined);
-                            try {
-                              setRehearsal(await rehearseRecovery());
-                            } catch {
-                              setRehearsalError(true);
-                            } finally {
-                              setRehearsing(false);
-                            }
-                          }}
-                        >
-                          {rehearsing
-                            ? "Running rehearsal…"
-                            : "Rehearse Discord rejection and retry"}
-                        </button>
-                        {rehearsal && (
-                          <div className="handover-proof" role="status">
-                            <p>
-                              GitHub confirmed · {rehearsal.githubWrites} write
-                            </p>
-                            <p>Discord rejected the first attempt · HTTP 429</p>
-                            <p>
-                              Discord-only retry succeeded ·{" "}
-                              {rehearsal.discordAttempts} attempts total
-                            </p>
-                          </div>
-                        )}
-                        {rehearsalError && (
-                          <p role="alert">
-                            The rehearsal did not finish. Try again.
-                          </p>
-                        )}
-                      </details>
-                    )}
-                  </div>
-                </div>
-              )}
-              {events.length > 0 && (
-                <section className="timeline">
-                  <h3>
-                    <History size={17} /> Investigation timeline
-                  </h3>
-                  <ol>
-                    {events.map((event) => (
-                      <li key={event.id}>
-                        <time>{event.time} UTC</time>
-                        <p>{event.text}</p>
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-              )}
-            </div>
-          </section>
-        </div>
+              <figure>
+                <figcaption><AudioLines size={20} aria-hidden="true" /> Try asking</figcaption>
+                <blockquote>“What changed since the last passing checkout run?”</blockquote>
+              </figure>
+              <Link href="/workspace" className={styles.sourceLink}>
+                Sign in to inspect GitHub sources <ArrowRight size={17} aria-hidden="true" />
+              </Link>
+            </section>
+          </div>
+        </section>
+
+        <aside className={styles.partners} aria-label="Voice technology">
+          <div className={styles.wrap}>
+            <p>Built for live voice</p>
+            <div className={styles.partner}><Image src="/brands/agora.svg" alt="Agora" width={102} height={34} unoptimized /> <span>Live conversation</span></div>
+            <div className={styles.partner}><Image src="/brands/murf.svg" alt="Murf" width={102} height={34} unoptimized /> <span>Falcon text-to-speech</span></div>
+          </div>
+        </aside>
+
+        <section className={`${styles.wrap} ${styles.story}`} id="how-it-works" aria-labelledby="story-title">
+          <h2 id="story-title">From first question<br />to next shift.</h2>
+          <ol>
+            {chapters.map((chapter) => (
+              <li key={chapter.title}>
+                <div><h3>{chapter.title}</h3><p>{chapter.copy}</p></div>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <footer className={styles.footer}>
+          <div className={styles.wrap}>
+            <Wordmark />
+            <WorkspaceLink />
+          </div>
+        </footer>
       </main>
-    </>
+    </div>
   );
 }

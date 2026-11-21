@@ -36,6 +36,15 @@ export function evidenceSpotlight(evidence: unknown) {
         },
       ];
     }
+    if (suffix === "failure" && node.title === "Job log output") {
+      return [
+        {
+          id: node.id,
+          cue: "job log output",
+          line: "Look at the job log output. " + node.summary.replace(/[.!?]+$/, "") + ".",
+        },
+      ];
+    }
     const summary =
       suffix === "diff" && /^-.*"paymentSchemaRevision"/m.test(node.detail)
         ? "The field for the payment schema revision disappeared after the last passing build"

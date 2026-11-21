@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "eslint app lib tests",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run tests/workflow.test.ts",
+    "test": "vitest run tests/*.test.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

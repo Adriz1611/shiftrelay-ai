@@ -6,6 +6,8 @@ export function db(
 ) {
   mkdirSync(dirname(path), { recursive: true });
   const d = new DatabaseSync(path);
+  // A workspace poll can overlap a voice callback writing the next command.
+  d.exec("PRAGMA busy_timeout = 3000");
   d.exec(
     "CREATE TABLE IF NOT EXISTS records(id INTEGER PRIMARY KEY, time TEXT DEFAULT CURRENT_TIMESTAMP, data TEXT NOT NULL)",
   );
